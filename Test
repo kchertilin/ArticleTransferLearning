@@ -1,0 +1,88 @@
+# Подключаем библиотеки
+from __future__ import print_function, division
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.optim import lr_scheduler
+import torchvision
+from torchvision import datasets, models, transforms
+import matplotlib.pyplot as plt
+import numpy as np
+import time
+import os
+import copy
+ 
+# Загружаем и преобразуем датасет
+
+# Нормализация, ротация ориентации и обрезание изображений
+mean_nums = [0.485, 0.456, 0.406]
+std_nums = [0.229, 0.224, 0.225]
+
+chosen_transforms = {'val': transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(350),
+        transforms.ToTensor(),
+        transforms.Normalize(mean_nums, std_nums)
+]),
+}
+# Путь к датасету
+data_dir = 'data_path'
+
+# Создание датасетов с помощью Image Folder
+chosen_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
+  chosen_transforms[x])
+                  for x in ['val']}
+
+# Загрузка данных
+dataloaders = {x: torch.utils.data.DataLoader(chosen_datasets[x], batch_size=1,
+  shuffle=True)
+              for x in ['val']}
+
+dataset_sizes = {x: len(chosen_datasets[x]) for x in ['val']}
+class_names = chosen_datasets['val'].classes
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Настройка изображения
+def imshow(inp, title=None):
+    inp = inp.numpy().transpose((1, 2, 0))
+    mean = np.array([mean_nums])
+    std = np.array([std_nums])
+    inp = std * inp + mean
+    inp = np.clip(inp, 0, 1)
+    plt.figure(figsize=(10, 10))
+    plt.imshow(inp)
+    if title is not None:
+        plt.title(title, fontsize=60)
+    plt.pause(0.001)  # Пауза для обновления
+
+
+# Загрузка обученной НС
+model=torch.load('model_path')
+
+# Примеры классификации
+def visualize_model(model, num_images=10):
+    
+    model.eval()
+    images_handeled = 0
+    fig = plt.figure()
+
+    with torch.no_grad():
+        for i, (inputs, labels) in enumerate(dataloaders['val']):
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+            
+            for j in range(inputs.size()[0]):
+                images_handeled += 1
+                ax = plt.subplot(num_images+1//2, 2, images_handeled)
+                ax.axis('off')
+                ax.set_title('предсказано: {}, на самом деле: {}'.format(class_names[preds[j]], class_names[labels.data]))
+                imshow(inputs.cpu().data[j])
+
+                if images_handeled == num_images:  
+                    return
+visualize_model(model)
+plt.show()
